@@ -476,7 +476,8 @@ namespace llvm {
   /// MachineTraceMetrics - This pass computes critical path and CPU resource
   /// usage in an ensemble of traces.
   extern char &MachineTraceMetricsID;
-
+  /// IfConvertionPreRegAllocation - This pass performs if-convertion on the SSA form machine code  
+  extern char &IfConvertionPreRegAllocationID;
   /// EarlyIfConverter - This pass performs if-conversion on SSA form by
   /// inserting cmov instructions.
   extern char &EarlyIfConverterID;

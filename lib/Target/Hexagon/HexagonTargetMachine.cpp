@@ -152,6 +152,7 @@ bool HexagonPassConfig::addPreRegAlloc() {
   if (getOptLevel() != CodeGenOpt::None)
     if (!DisableHardwareLoops)
       addPass(createHexagonHardwareLoops());
+    addPass(&IfConvertionPreRegAllocationID);
   return false;
 }
 

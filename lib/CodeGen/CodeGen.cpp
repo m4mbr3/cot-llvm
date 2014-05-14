@@ -23,6 +23,7 @@ void llvm::initializeCodeGen(PassRegistry &Registry) {
   initializeBasicTTIPass(Registry);
   initializeBranchFolderPassPass(Registry);
   initializeDeadMachineInstructionElimPass(Registry);
+  initializeIfConvertionPreRegAllocationPass(Registry);
   initializeEarlyIfConverterPass(Registry);
   initializeExpandPostRAPass(Registry);
   initializeExpandISelPseudosPass(Registry);
