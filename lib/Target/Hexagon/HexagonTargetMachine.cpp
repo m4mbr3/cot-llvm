@@ -37,6 +37,13 @@ static cl::opt<bool> DisableHexagonCFGOpt("disable-hexagon-cfgopt",
       cl::Hidden, cl::ZeroOrMore, cl::init(false),
       cl::desc("Disable Hexagon CFG Optimization"));
 
+static cl::opt<bool> DisableIfConvertionPreRegAllocation("disable-if-convertion-pre-reg-allocation", 
+      cl::Hidden, cl::ZeroOrMore, cl::init(false), 
+      cl::desc("Disable Hexagon if convertion pre reg allocation"));
+
+static cl::opt<bool> DisableIfConverter ("disable-if-converter", 
+      cl::Hidden, cl::ZeroOrMore, cl::init(false), 
+      cl::desc("Disable Hexagon if converter"));
 
 /// HexagonTargetMachineModule - Note that this is used on hosts that
 /// cannot link in a library unless there are references into the
@@ -152,7 +159,8 @@ bool HexagonPassConfig::addPreRegAlloc() {
   if (getOptLevel() != CodeGenOpt::None)
     if (!DisableHardwareLoops)
       addPass(createHexagonHardwareLoops());
-    addPass(&IfConvertionPreRegAllocationID);
+    if(!DisableIfConvertionPreRegAllocation)
+      addPass(&IfConvertionPreRegAllocationID);
   return false;
 }
 
@@ -170,7 +178,7 @@ bool HexagonPassConfig::addPreSched2() {
     (const HexagonTargetObjectFile &)getTargetLowering()->getObjFileLowering();
 
   addPass(createHexagonCopyToCombine());
-  if (getOptLevel() != CodeGenOpt::None)
+  if (getOptLevel() != CodeGenOpt::None && !DisableIfConverter)
     addPass(&IfConverterID);
   if (!TLOF.IsSmallDataEnabled()) {
     addPass(createHexagonSplitConst32AndConst64(TM));
