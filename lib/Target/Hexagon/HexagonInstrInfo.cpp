@@ -168,7 +168,30 @@ HexagonInstrInfo::InsertBranch(MachineBasicBlock &MBB,MachineBasicBlock *TBB,
     return 2;
 }
 
+bool HexagonInstrInfo::canInsertSelect (const MachineBasicBlock &MBB,
+                                       const SmallVectorImpl<MachineOperand> &Cond, 
+                                       unsigned TrueReg,
+                                       unsigned FalseReg,
+                                       int &CondCycles,
+                                       int &TrueCycles,
+                                       int &FalseCycles) const {
+    return true;
+}
 
+void HexagonInstrInfo::insertSelect (MachineBasicBlock &MBB,
+                                     MachineBasicBlock::iterator I,
+                                     DebugLoc DL,
+                                     unsigned DstReg,
+                                     const SmallVectorImpl < MachineOperand > &Cond, 
+                                     unsigned TrueReg,
+                                     unsigned FalseReg) const {
+    MachineRegisterInfo &MRI = MBB.getParent()->getRegInfo();
+    assert(Cond.size() == 1 && "Invalid Cond array");
+    unsigned Opc = getCMovFromCond(Cond[0].getImm(),
+                                    MRI.getRegClass(DstReg)->getSize(),
+                                    false);
+    BuildMI(&MBB, DL, get(Opc), DstReg).addReg(FalseReg).addReg(TrueReg);
+}
 bool HexagonInstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,
                                      MachineBasicBlock *&TBB,
                                  MachineBasicBlock *&FBB,

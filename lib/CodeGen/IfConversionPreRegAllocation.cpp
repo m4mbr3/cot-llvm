@@ -181,6 +181,7 @@ public:
 /// Any clobbered regunits are added to ClobberedRegUnits.
 ///
 bool SSAIfConv::canSpeculateInstrs(MachineBasicBlock *MBB) {
+  return true;
   // Reject any live-in physregs. It's probably CPSR/EFLAGS, and very hard to
   // get right.
   if (!MBB->livein_empty()) {
@@ -655,14 +656,83 @@ void IfConvertionPreRegAllocation::invalidateTraces() {
   Traces->invalidate(IfConv.FBB);
   Traces->verifyAnalysis();
 }
+// Adjust cycles with downward saturation.
+static unsigned adjCycles(unsigned Cyc, int Delta) {
+  if (Delta < 0 && Cyc + Delta > Cyc)
+    return 0;
+  return Cyc + Delta;
+}
 
 /// Apply cost model and heuristics to the if-conversion in IfConv.
 /// Return true if the conversion is a good idea.
 ///
 bool IfConvertionPreRegAllocation::shouldConvertIf() {
-    // Stress testing mode disables all cost consideration
-    if (Stress)
-        return true;
+  // Stress testing mode disables all cost considerations.
+  if (Stress)
+      return true;
+
+  if (!MinInstr)
+      MinInstr = Traces->getEnsemble(MachineTraceMetrics::TS_MinInstrCount);
+
+  MachineTraceMetrics::Trace TBBTrace = MinInstr->getTrace(IfConv.getTPred());
+  MachineTraceMetrics::Trace FBBTrace = MinInstr->getTrace(IfConv.getFPred());
+  DEBUG(dbgs() << "TBB: " << TBBTrace << "FBB: " << FBBTrace);
+  unsigned MinCrit = std::min(TBBTrace.getCriticalPath(),
+                              FBBTrace.getCriticalPath());
+
+  // Set a somewhat arbitrary limit on the critical path extension we accept.
+  unsigned CritLimit = SchedModel->MispredictPenalty/2;
+
+  // Assume that the depth of the first head terminator will also be the depth
+  // of the select instruction inserted, as determined by the flag dependency.
+  // TBB / FBB data dependencies may delay the select even more.
+  MachineTraceMetrics::Trace HeadTrace = MinInstr->getTrace(IfConv.Head);
+  unsigned BranchDepth =
+    HeadTrace.getInstrCycles(IfConv.Head->getFirstTerminator()).Depth;
+  DEBUG(dbgs() << "Branch depth: " << BranchDepth << '\n');
+ 
+  // Look at all the tail phis, and compute the critical path extension caused
+  // by inserting select instructions.
+  MachineTraceMetrics::Trace TailTrace = MinInstr->getTrace(IfConv.Tail);
+  for (unsigned i = 0, e = IfConv.PHIs.size(); i != e; ++i) {
+    SSAIfConv::PHIInfo &PI = IfConv.PHIs[i];
+    unsigned Slack = TailTrace.getInstrSlack(PI.PHI);
+    unsigned MaxDepth = Slack + TailTrace.getInstrCycles(PI.PHI).Depth;
+    DEBUG(dbgs() << "Slack " << Slack << ":\t" << *PI.PHI);
+
+    // The condition is pulled into the critical path.
+    unsigned CondDepth = adjCycles(BranchDepth, PI.CondCycles);
+    if (CondDepth > MaxDepth) {
+      unsigned Extra = CondDepth - MaxDepth;
+      DEBUG(dbgs() << "Condition adds " << Extra << " cycles.\n");
+      if (Extra > CritLimit) {
+        DEBUG(dbgs() << "Exceeds limit of " << CritLimit << '\n');
+        return false;
+      }
+    }
+
+    // The TBB value is pulled into the critical path.
+    unsigned TDepth = adjCycles(TBBTrace.getPHIDepth(PI.PHI), PI.TCycles);
+    if (TDepth > MaxDepth) {
+      unsigned Extra = TDepth - MaxDepth;
+      DEBUG(dbgs() << "TBB data adds " << Extra << " cycles.\n");
+      if (Extra > CritLimit) {
+        DEBUG(dbgs() << "Exceeds limit of " << CritLimit << '\n');
+        return false;
+      }
+    }
+
+    // The FBB value is pulled into the critical path.
+    unsigned FDepth = adjCycles(FBBTrace.getPHIDepth(PI.PHI), PI.FCycles);
+    if (FDepth > MaxDepth) {
+      unsigned Extra = FDepth - MaxDepth;
+      DEBUG(dbgs() << "FBB data adds " << Extra << " cycles.\n");
+      if (Extra > CritLimit) {
+        DEBUG(dbgs() << "Exceeds limit of " << CritLimit << '\n');
+        return false;
+      }
+    }
+  }
     return true;
 }
 
@@ -718,9 +788,9 @@ INITIALIZE_PASS_BEGIN(IfConvertionPreRegAllocation,
                 "If Convertion on machine code before register allocation", 
                 false, 
                 false)
-INITIALIZE_PASS_DEPENDENCY(MachineBranchProbabilityInfo)
-INITIALIZE_PASS_DEPENDENCY(MachineDominatorTree)
-INITIALIZE_PASS_DEPENDENCY(MachineTraceMetrics)
+//INITIALIZE_PASS_DEPENDENCY(MachineBranchProbabilityInfo)
+//INITIALIZE_PASS_DEPENDENCY(MachineDominatorTree)
+//INITIALIZE_PASS_DEPENDENCY(MachineTraceMetrics)
 INITIALIZE_PASS_DEPENDENCY(OptimizePHIs)
 INITIALIZE_PASS_END(IfConvertionPreRegAllocation, 
                 "if-convertion-pre-reg-allocation", 

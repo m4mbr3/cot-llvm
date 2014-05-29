@@ -78,6 +78,20 @@ public:
                            unsigned DestReg, unsigned SrcReg,
                            bool KillSrc) const;
 
+  virtual bool canInsertSelect (const MachineBasicBlock &MBB,
+                                const SmallVectorImpl<MachineOperand> &Cond,
+                                unsigned TrueReg,
+                                unsigned FalseReg, 
+                                int &CondCycles,
+                                int &TrueCycles,
+                                int &FalseCycles) const;
+  virtual void insertSelect (MachineBasicBlock &MBB,
+                             MachineBasicBlock::iterator I,
+                             DebugLoc           DL,
+                             unsigned           DstReg,
+                             const SmallVectorImpl< MachineOperand> &Cond,
+                             unsigned           TrueReg,
+                             unsigned           FalseReg) const;
   virtual void storeRegToStackSlot(MachineBasicBlock &MBB,
                                    MachineBasicBlock::iterator MBBI,
                                    unsigned SrcReg, bool isKill, int FrameIndex,
