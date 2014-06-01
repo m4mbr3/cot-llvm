@@ -895,6 +895,7 @@ void IfConvertionPreRegAllocation::AnalyzeBlocks(MachineFunction &MF,
   for (MachineFunction::iterator I = MF.begin(), E = MF.end(); I != E; ++I) {
     MachineBasicBlock *BB = I;
     AnalyzeBlock(BB, Tokens);
+    DEBUG(dbgs()  << "Tokens found : " << Tokens.size() << "\n"); 
   }
 
   // Sort to favor more complex ifconvpreregall scheme.
@@ -1300,7 +1301,7 @@ bool IfConvertionPreRegAllocation::IfConvertDiamond(BBInfo &BBI, IfcvtKind Kind,
   DontKill.init(TRI);
   for (MachineBasicBlock::reverse_iterator I = BBI2->BB->rbegin(),
        E = MachineBasicBlock::reverse_iterator(DI2); I != E; ++I) {
-    DontKill.stepBackward(*I);
+    //DontKill.stepBackward(*I);
   }
 
   for (MachineBasicBlock::const_iterator I = BBI1->BB->begin(), E = DI1; I != E;
