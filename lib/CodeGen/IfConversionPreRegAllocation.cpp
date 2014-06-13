@@ -35,6 +35,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetRegisterInfo.h"
 #include "llvm/Target/TargetSubtargetInfo.h"
+#include "PHIEliminationUtils.h"
 #include <iostream>
 
 using namespace llvm;
@@ -181,6 +182,8 @@ namespace {
             //virtual void getAnalysisUsage(AnalysisUsage &AU) const; 
             virtual bool runOnMachineFunction(MachineFunction &MF);
         private:
+            void LowerPHINode (MachineBasicBlock &MBB, 
+                                MachineBasicBlock::iterator LastPHIIt);
             bool ReverseBranchCondition(BBInfo &BBI);
             bool ValidSimple(BBInfo &TrueBBI, unsigned &Dups,
                     const BranchProbability &Prediction) const;
@@ -1485,14 +1488,95 @@ void IfConvertionPreRegAllocation::CopyAndPredicateBlock(BBInfo &ToBBI, BBInfo &
 
   ++NumDupBBs;
 }
+/// isImplicitlyDefined - Return true if all defs of VirtReg are implicit-defs.
+/// This includes registers with no defs.
+static bool isImplicitlyDefined(unsigned VirtReg,
+        const MachineRegisterInfo *MRI) {
+    for (MachineInstr &DI : MRI->def_instructions(VirtReg))
+        if (!DI.isImplicitDef())
+            return false;
+    return true;
+}
 
+/// isSourceDefinedByImplicitDef - Return true if all sources of the phi node
+/// are implicit_def's.
+static bool isSourceDefinedByImplicitDef(const MachineInstr *MPhi,
+        const MachineRegisterInfo *MRI) {
+    for (unsigned i = 1; i != MPhi->getNumOperands(); i += 2)
+        if (!isImplicitlyDefined(MPhi->getOperand(i).getReg(), MRI))
+            return false;
+    return true;
+}
+void IfConvertionPreRegAllocation::LowerPHINode(MachineBasicBlock &MBB, 
+                                                MachineBasicBlock::iterator LastPHIIt) {
+    MachineBasicBlock::iterator AfterPHIsIt = next(LastPHIIt);
+    MachineInstr *MPhi = MBB.remove(MBB.begin());
+
+    unsigned NumSrcs = (MPhi->getNumOperands()-1)/2;
+    unsigned DestReg = MPhi->getOperand(0).getReg();
+    assert (MPhi->getOperand(0).getSubReg() == 0 && "Can't handle sub-reg PHIs");
+    bool isDead = MPhi->getOperand(0).isDead();
+
+    //Create a new register for the incoming PHI arguments.
+    MachineFunction &MF = *MBB.getParent();
+    unsigned IncomingReg = 0;
+    bool reusedIncoming = false;
+
+    const TargetInstrInfo *TII = MF.getTarget().getInstrInfo();
+    if (isSourceDefinedByImplicitDef(MPhi, MRI))
+        BuildMI(MBB, AfterPHIsIt, MPhi->getDebugLoc(),TII->get(TargetOpcode::IMPLICIT_DEF), DestReg);
+    else {
+        BuildMI(MBB, AfterPHIsIt, MPhi->getDebugLoc(), TII->get(TargetOpcode::COPY), DestReg).addReg(IncomingReg);
+    }
+    for (int i = NumSrcs -1; i >= 0; --i) {
+        unsigned SrcReg = MPhi->getOperand(i*2+1).getSubReg();
+        unsigned SrcSubReg = MPhi->getOperand(i*2+1).getSubReg();
+        bool SrcUndef = MPhi->getOperand(i*2+1).isUndef() ||
+            isImplicitlyDefined(SrcReg, MRI);
+        assert(TargetRegisterInfo::isVirtualRegister(SrcReg) &&
+            "Machine PHI Operands must all be virtual registers!");
+        MachineBasicBlock &opBlock = *MPhi->getOperand(i*2+2).getMBB();
+        SmallPtrSet<MachineBasicBlock*, 8> MBBsInsertedInto;
+        if (!MBBsInsertedInto.insert(&opBlock))
+            continue;
+        MachineBasicBlock::iterator InsertPos = 
+            findPHICopyInsertPoint(&opBlock, &MBB, SrcReg);
+        MachineInstr *NewSrcInstr = NULL;
+
+        if (!reusedIncoming && IncomingReg) {
+            if (SrcUndef) {
+                NewSrcInstr = BuildMI(opBlock, InsertPos, MPhi->getDebugLoc(), 
+                    TII->get(TargetOpcode::IMPLICIT_DEF), 
+                    IncomingReg);
+                //if (MachineInstr *DefMi = MRI->getVRegDef(SrcReg))
+                //    if (DefMi->isImplicitDef())
+                //        ImpDefs.insert(DefMi);
+            }
+            else {
+                NewSrcInstr = BuildMI(opBlock, InsertPos, MPhi->getDebugLoc(), 
+                        TII->get(TargetOpcode::COPY), IncomingReg).addReg(SrcReg, 0, SrcSubReg);
+            }
+        }
+    }
+
+    // Really delete the PHI instruction now, if it is not in the LoweredPHIs map.
+    if (reusedIncoming || !IncomingReg) {
+        MF.DeleteMachineInstr(MPhi); 
+    }
+}
 /// MergeBlocks - Move all instructions from FromBB to the end of ToBB.
 /// This will leave FromBB as an empty block, so remove all of its
 /// successor edges except for the fall-through edge.  If AddEdges is true,
 /// i.e., when FromBBI's branch is being moved, add those successor edges to
 /// ToBBI.
 void IfConvertionPreRegAllocation::MergeBlocks(BBInfo &ToBBI, BBInfo &FromBBI, bool AddEdges) {
-
+  for ( MachineBasicBlock::iterator I = ToBBI.BB->begin(),
+        E = ToBBI.BB->end(); I != E; ++I) {
+     MachineInstr *in = I;
+     if ( in->isPHI() ) {
+        LowerPHINode(ToBBI.BB, I);
+     }
+  }
   assert(!FromBBI.BB->hasAddressTaken() &&
          "Removing a BB whose address is taken!");
   ToBBI.BB->splice(ToBBI.BB->end(),
@@ -1532,6 +1616,8 @@ void IfConvertionPreRegAllocation::MergeBlocks(BBInfo &ToBBI, BBInfo &FromBBI, b
   ToBBI.HasFallThrough = FromBBI.HasFallThrough;
   ToBBI.IsAnalyzed = false;
   FromBBI.IsAnalyzed = false;
+  MachineInstr *toRem = NULL; 
+  
 }
 char IfConvertionPreRegAllocation::ID = 0;
 char &llvm::IfConvertionPreRegAllocationID = IfConvertionPreRegAllocation::ID;
