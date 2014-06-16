@@ -323,6 +323,7 @@ void CodeGenTarget::ComputeInstrsByEnum() const {
     "LIFETIME_END",
     "STACKMAP",
     "PATCHPOINT",
+    "PSI",
     0
   };
   const DenseMap<const Record*, CodeGenInstruction*> &Insts = getInstructions();
