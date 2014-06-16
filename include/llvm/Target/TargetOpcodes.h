@@ -104,7 +104,9 @@ namespace TargetOpcode {
     /// support optimizations for dynamic languages (such as javascript) that
     /// rewrite calls to runtimes with more efficient code sequences.
     /// This also implies a stack map.
-    PATCHPOINT = 18
+    PATCHPOINT = 18,
+    /// Predicable copy
+    PSI = 19
   };
 } // end namespace TargetOpcode
 } // end namespace llvm
