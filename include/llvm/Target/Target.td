@@ -795,6 +795,14 @@ def COPY : Instruction {
   let neverHasSideEffects = 1;
   let isAsCheapAsAMove = 1;
 }
+def PSI : Instruction {
+  let OutOperandList = (outs unknown:$dst);
+  let InOperandList = (ins unknown:$src, variable_ops);
+  let AsmString = "PSI_NODE";
+  let neverHasSideEffects = 1;
+  let isAsCheapAsAMove = 1;
+  let isPredicable = 1;
+}
 def BUNDLE : Instruction {
   let OutOperandList = (outs);
   let InOperandList = (ins variable_ops);
