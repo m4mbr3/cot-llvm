@@ -677,6 +677,7 @@ FunctionPass *TargetPassConfig::createRegAllocPass(bool Optimized) {
 void TargetPassConfig::addFastRegAlloc(FunctionPass *RegAllocPass) {
   addPass(&PHIEliminationID);
   addPass(&TwoAddressInstructionPassID);
+  addPass(&PSIEliminationID);
 
   addPass(RegAllocPass);
   printAndVerify("After Register Allocation");
@@ -705,6 +706,8 @@ void TargetPassConfig::addOptimizedRegAlloc(FunctionPass *RegAllocPass) {
     addPass(&LiveIntervalsID);
 
   addPass(&TwoAddressInstructionPassID);
+  addPass(&PSIEliminationID);
+
   addPass(&RegisterCoalescerID);
 
   // PreRA instruction scheduling.

@@ -388,7 +388,9 @@ namespace llvm {
   /// desired input for some register allocators.  This pass is "required" by
   /// these register allocator like this: AU.addRequiredID(PHIEliminationID);
   extern char &PHIEliminationID;
-
+  /// PSIElimination - This pass eliminates machine instruction PSI node
+  /// by interting two predicated copy.
+  extern char &PSIEliminationID;
   /// LiveIntervals - This analysis keeps track of the live ranges of virtual
   /// and physical registers.
   extern char &LiveIntervalsID;

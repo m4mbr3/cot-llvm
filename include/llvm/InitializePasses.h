@@ -203,6 +203,7 @@ void initializeOptimizePHIsPass(PassRegistry&);
 void initializePartiallyInlineLibCallsPass(PassRegistry&);
 void initializePEIPass(PassRegistry&);
 void initializePHIEliminationPass(PassRegistry&);
+void initializePSIEliminationPass(PassRegistry&);
 void initializePartialInlinerPass(PassRegistry&);
 void initializePeepholeOptimizerPass(PassRegistry&);
 void initializePostDomOnlyPrinterPass(PassRegistry&);

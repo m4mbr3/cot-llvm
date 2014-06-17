@@ -1354,22 +1354,10 @@ bool IfConvertionPreRegAllocation::IfConvertDiamond(BBInfo &BBI, IfcvtKind Kind,
     MachineBasicBlock::iterator AfterPHIsIt = next(TailBBI.BB->begin());
     MachineInstr *MPhi = TailBBI.BB->remove(TailBBI.BB->begin());  
     unsigned DestReg = MPhi->getOperand(0).getReg();
-    unsigned Numsrs = (MPhi->getNumOperands() - 1)/2;
-    MachineFunction &MF = *TailBBI.BB->getParent();
     assert(MPhi->getOperand(0).getSubReg() == 0 && "Can't handle sub-reg PHIs");
     unsigned IncomingReg = 0;
-    const TargetRegisterClass *RC = MF.getRegInfo().getRegClass(DestReg);
     IncomingReg = MPhi->getOperand(1).getReg();
-    dbgs() << "NUM STUFF: " << MPhi->getNumOperands();
-    BuildMI(*TailBBI.BB, AfterPHIsIt, MPhi->getDebugLoc(), TII->get(TargetOpcode::PSI), DestReg).addReg(MPhi->getOperand(1).getReg()).addReg(MPhi->getOperand(3).getReg()); 
-    if (!TII->PredicateInstruction(AfterPHIsIt, *Cond2)) {
-        dbgs() << "Fuck...";
-    }
-    //BuildMI(*TailBBI.BB, AfterPHIsIt, MPhi->getDebugLoc(), TII->get(TargetOpcode::PSI), DestReg).addReg(MPhi->getOperand(3).getReg());
-    //if (!TII->PredicateInstruction(AfterPHIsIt, *Cond1)) {
-    //    dbgs() << "I would say fuck...";
-    //}
-   
+    BuildMI(*TailBBI.BB, AfterPHIsIt, MPhi->getDebugLoc(), TII->get(TargetOpcode::PSI), DestReg).addReg(MPhi->getOperand(1).getReg()).addReg(MPhi->getOperand(3).getReg()).addOperand(*Cond1->begin()).addOperand(*Cond2->begin()); 
     ////////////
     bool CanMergeTail = !TailBBI.HasFallThrough &&
       !TailBBI.BB->hasAddressTaken();

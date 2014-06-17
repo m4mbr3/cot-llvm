@@ -41,6 +41,10 @@ static cl::opt<bool> DisableIfConvertionPreRegAllocation("disable-if-convertion-
       cl::Hidden, cl::ZeroOrMore, cl::init(false), 
       cl::desc("Disable Hexagon if convertion pre reg allocation"));
 
+static cl::opt<bool> DisablePSIElimination ("disable-psi-elimination",
+       cl::Hidden, cl::ZeroOrMore, cl::init(false),
+       cl::desc("Disable Hexagon PSIElimination "));
+
 static cl::opt<bool> DisableIfConverter ("disable-if-converter", 
       cl::Hidden, cl::ZeroOrMore, cl::init(false), 
       cl::desc("Disable Hexagon if converter"));
@@ -169,6 +173,8 @@ bool HexagonPassConfig::addPostRegAlloc() {
   if (getOptLevel() != CodeGenOpt::None)
     if (!DisableHexagonCFGOpt)
       addPass(createHexagonCFGOptimizer(TM));
+//  if (!DisablePSIElimination)
+//    addPass(&PSIEliminationID);
   return false;
 }
 
