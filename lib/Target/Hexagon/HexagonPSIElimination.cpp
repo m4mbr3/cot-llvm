@@ -16,7 +16,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Target/TargetInstrInfo.h"
 #include "llvm/Target/TargetMachine.h"
-#include "../Target/Hexagon/Hexagon.h"
+#include "Hexagon.h"
 #include <algorithm>
 using namespace llvm;
 
@@ -78,12 +78,16 @@ void PSIElimination::LowerPSINode(MachineBasicBlock &MBB) {
             MachineOperand Cond1 = ins->getOperand(3);
             MachineOperand Cond2 = ins->getOperand(4);
             MachineBasicBlock::iterator AfterPSIsIt = next(I);
-            MachineInstr *MPhi = MBB->remove(I);
+            MachineInstr *MPhi = MBB.remove(I);
             I = AfterPSIsIt;
-            BuildMI(MBB, AfterPSIsIt, MPhi->getDebugLoc(), TII->get(Hexagon::TFR), DestReg).addReg(firstReg);
-            TII->PredicateInstruction(aFterPSIsIt, Cond1);
-            BuildMI(MBB, AfterPSIsIt, MPhi->getDebugLoc(), TII->get(Hexagon::TFR), DestReg).addReg(secondReg);
-            TII->PredicateInstruction(AfterPSIsIt, Cond2);
+            BuildMI(MBB, AfterPSIsIt, MPhi->getDebugLoc(), TII->get(Hexagon::TFR_cPt), DestReg).addReg(firstReg);
+            SmallVector<MachineOperand, 4> Cond_1;
+            Cond_1.push_back(Cond1);
+            //TII->PredicateInstruction(AfterPSIsIt, Cond_1);
+            BuildMI(MBB, AfterPSIsIt, MPhi->getDebugLoc(), TII->get(Hexagon::TFR_cNotPt), DestReg).addReg(secondReg);
+            SmallVector<MachineOperand, 4> Cond_2;
+            Cond_2.push_back(Cond2);
+            //TII->PredicateInstruction(AfterPSIsIt, Cond_1);
         }
     }
     return;
