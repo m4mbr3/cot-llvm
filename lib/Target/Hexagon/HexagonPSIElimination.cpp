@@ -16,6 +16,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Target/TargetInstrInfo.h"
 #include "llvm/Target/TargetMachine.h"
+#include "../Target/Hexagon/Hexagon.h"
 #include <algorithm>
 using namespace llvm;
 
@@ -65,5 +66,25 @@ bool PSIElimination::runOnMachineFunction(MachineFunction &MF) {
 }
 
 void PSIElimination::LowerPSINode(MachineBasicBlock &MBB) {
+    for (MachineBasicBlock::iterator I = MBB.begin(), 
+         E = MBB.end(); 
+         I != E;
+         ++I) {
+        MachineInstr *ins = I;
+        if ( ins->getOpcode() == TargetOpcode::PSI ) {
+            unsigned DestReg = ins->getOperand(0).getReg();
+            unsigned firstReg = ins->getOperand(1).getReg();
+            unsigned secondReg = ins->getOperand(2).getReg();
+            MachineOperand Cond1 = ins->getOperand(3);
+            MachineOperand Cond2 = ins->getOperand(4);
+            MachineBasicBlock::iterator AfterPSIsIt = next(I);
+            MachineInstr *MPhi = MBB->remove(I);
+            I = AfterPSIsIt;
+            BuildMI(MBB, AfterPSIsIt, MPhi->getDebugLoc(), TII->get(Hexagon::TFR), DestReg).addReg(firstReg);
+            TII->PredicateInstruction(aFterPSIsIt, Cond1);
+            BuildMI(MBB, AfterPSIsIt, MPhi->getDebugLoc(), TII->get(Hexagon::TFR), DestReg).addReg(secondReg);
+            TII->PredicateInstruction(AfterPSIsIt, Cond2);
+        }
+    }
     return;
 }
