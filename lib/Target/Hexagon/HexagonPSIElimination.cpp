@@ -18,6 +18,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include "Hexagon.h"
 #include <algorithm>
+#include <vector>
 using namespace llvm;
 
 namespace {
@@ -49,6 +50,7 @@ INITIALIZE_PASS_END(PSIElimination, "psi-node-elimination",
                             "Eliminate PSI nodes for register allocation",
                             false,false)
 void PSIElimination::getAnalysisUsage(AnalysisUsage &AU) const {
+    AU.addPreserved<LiveVariables>();
     MachineFunctionPass::getAnalysisUsage(AU);
 }
 
@@ -75,19 +77,31 @@ void PSIElimination::LowerPSINode(MachineBasicBlock &MBB) {
             unsigned DestReg = ins->getOperand(0).getReg();
             unsigned firstReg = ins->getOperand(1).getReg();
             unsigned secondReg = ins->getOperand(2).getReg();
-            MachineOperand Cond1 = ins->getOperand(3);
-            MachineOperand Cond2 = ins->getOperand(4);
+            int i = 3;
+            SmallVector<MachineOperand, 4> Cond_1;
+            SmallVector<MachineOperand, 4> Cond_2;
+            if (ins->getOperand(i).isImm() && ins->getOperand(i).getImm() == 0) { 
+                dbgs() << "Saving operand1: " << ins->getOperand(i).getImm() << "\n";
+                Cond_1.push_back(ins->getOperand(i));
+                i++;
+            }
+            Cond_1.push_back(ins->getOperand(i));
+            dbgs() << "Size Cond1: "<< Cond_1.size() << "\n";
+            i++;
+            if (ins->getOperand(i).isImm() && ins->getOperand(i).getImm() == 0) {
+                dbgs() << "Saving operand2: " << ins->getOperand(i).getImm() << "\n";
+                Cond_2.push_back(ins->getOperand(i)); 
+                i++;
+            }
+            Cond_2.push_back(ins->getOperand(i));
+            dbgs() << "Size Cond2: "<< Cond_2.size() << "\n";
             MachineBasicBlock::iterator AfterPSIsIt = next(I);
             MachineInstr *MPhi = MBB.remove(I);
             I = AfterPSIsIt;
-            BuildMI(MBB, AfterPSIsIt, MPhi->getDebugLoc(), TII->get(Hexagon::TFR_cPt), DestReg).addReg(firstReg);
-            SmallVector<MachineOperand, 4> Cond_1;
-            Cond_1.push_back(Cond1);
-            //TII->PredicateInstruction(AfterPSIsIt, Cond_1);
-            BuildMI(MBB, AfterPSIsIt, MPhi->getDebugLoc(), TII->get(Hexagon::TFR_cNotPt), DestReg).addReg(secondReg);
-            SmallVector<MachineOperand, 4> Cond_2;
-            Cond_2.push_back(Cond2);
-            //TII->PredicateInstruction(AfterPSIsIt, Cond_1);
+            BuildMI(MBB, AfterPSIsIt, MPhi->getDebugLoc(), TII->get(Hexagon::TFR), DestReg).addReg(firstReg);
+            TII->PredicateInstruction(--AfterPSIsIt, Cond_1);
+            BuildMI(MBB, AfterPSIsIt, MPhi->getDebugLoc(), TII->get(Hexagon::TFR), DestReg).addReg(secondReg);
+            TII->PredicateInstruction(--AfterPSIsIt, Cond_2);
         }
     }
     return;

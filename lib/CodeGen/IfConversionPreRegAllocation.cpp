@@ -1357,7 +1357,20 @@ bool IfConvertionPreRegAllocation::IfConvertDiamond(BBInfo &BBI, IfcvtKind Kind,
     assert(MPhi->getOperand(0).getSubReg() == 0 && "Can't handle sub-reg PHIs");
     unsigned IncomingReg = 0;
     IncomingReg = MPhi->getOperand(1).getReg();
-    BuildMI(*TailBBI.BB, AfterPHIsIt, MPhi->getDebugLoc(), TII->get(TargetOpcode::PSI), DestReg).addReg(MPhi->getOperand(1).getReg()).addReg(MPhi->getOperand(3).getReg()).addOperand(*Cond1->begin()).addOperand(*Cond2->begin()); 
+    //Considerare il not
+    MachineInstrBuilder M = BuildMI(*TailBBI.BB, AfterPHIsIt, MPhi->getDebugLoc(), TII->get(TargetOpcode::PSI), DestReg).addReg(MPhi->getOperand(1).getReg()).addReg(MPhi->getOperand(3).getReg());//.addOperand(*Cond1->begin()).addOperand(*Cond2->begin()); 
+    for ( SmallVector<MachineOperand, 4>::iterator I = Cond1->begin(), 
+          E = Cond1->end(); 
+          I != E;
+          ++I) {
+        M.addOperand(*I);
+    }
+    for ( SmallVector<MachineOperand, 4>::iterator I = Cond2->begin(),
+          E = Cond2->end();
+          I != E;
+          ++I) {
+        M.addOperand(*I);
+    }
     ////////////
     bool CanMergeTail = !TailBBI.HasFallThrough &&
       !TailBBI.BB->hasAddressTaken();
