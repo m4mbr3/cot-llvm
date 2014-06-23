@@ -51,6 +51,8 @@ static cl::opt<bool> DisableSSC("disable-ssc", cl::Hidden,
     cl::desc("Disable Stack Slot Coloring"));
 static cl::opt<bool> DisableMachineDCE("disable-machine-dce", cl::Hidden,
     cl::desc("Disable Machine Dead Code Elimination"));
+static cl::opt<bool> DisableIfConvertionPreRegAllocation("disable-if-conv-pre-reg-alloc", cl::Hidden,
+    cl::desc("Disable If conversion-pre-reg-alloc"));
 static cl::opt<bool> DisableEarlyIfConversion("disable-early-ifcvt", cl::Hidden,
     cl::desc("Disable Early If-conversion"));
 static cl::opt<bool> DisableMachineLICM("disable-machine-licm", cl::Hidden,
@@ -169,6 +171,9 @@ static IdentifyingPassPtr overridePass(AnalysisID StandardID,
 
   if (StandardID == &DeadMachineInstructionElimID)
     return applyDisable(TargetID, DisableMachineDCE);
+
+  if (StandardID == &IfConvertionPreRegAllocationID)
+      return applyDisable(TargetID, DisableIfConvertionPreRegAllocation);
 
   if (StandardID == &EarlyIfConverterID)
     return applyDisable(TargetID, DisableEarlyIfConversion);
@@ -686,6 +691,7 @@ FunctionPass *TargetPassConfig::createRegAllocPass(bool Optimized) {
 void TargetPassConfig::addFastRegAlloc(FunctionPass *RegAllocPass) {
   addPass(&PHIEliminationID);
   addPass(&TwoAddressInstructionPassID);
+  addPass(&PSIEliminationID);
 
   addPass(RegAllocPass);
   printAndVerify("After Register Allocation");
@@ -714,6 +720,8 @@ void TargetPassConfig::addOptimizedRegAlloc(FunctionPass *RegAllocPass) {
     addPass(&LiveIntervalsID);
 
   addPass(&TwoAddressInstructionPassID);
+  addPass(&PSIEliminationID);
+
   addPass(&RegisterCoalescerID);
 
   // PreRA instruction scheduling.

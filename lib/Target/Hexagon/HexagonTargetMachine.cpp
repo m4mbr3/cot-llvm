@@ -37,6 +37,17 @@ static cl::opt<bool> DisableHexagonCFGOpt("disable-hexagon-cfgopt",
       cl::Hidden, cl::ZeroOrMore, cl::init(false),
       cl::desc("Disable Hexagon CFG Optimization"));
 
+static cl::opt<bool> DisableIfConvertionPreRegAllocation("disable-if-convertion-pre-reg-allocation", 
+      cl::Hidden, cl::ZeroOrMore, cl::init(false), 
+      cl::desc("Disable Hexagon if convertion pre reg allocation"));
+
+static cl::opt<bool> DisablePSIElimination ("disable-psi-elimination",
+       cl::Hidden, cl::ZeroOrMore, cl::init(false),
+       cl::desc("Disable Hexagon PSIElimination "));
+
+static cl::opt<bool> DisableIfConverter ("disable-if-converter", 
+      cl::Hidden, cl::ZeroOrMore, cl::init(false), 
+      cl::desc("Disable Hexagon if converter"));
 
 /// HexagonTargetMachineModule - Note that this is used on hosts that
 /// cannot link in a library unless there are references into the
@@ -137,6 +148,8 @@ bool HexagonPassConfig::addPreRegAlloc() {
   if (getOptLevel() != CodeGenOpt::None)
     if (!DisableHardwareLoops)
       addPass(createHexagonHardwareLoops());
+    if(!DisableIfConvertionPreRegAllocation)
+      addPass(&IfConvertionPreRegAllocationID);
   return false;
 }
 
@@ -145,6 +158,8 @@ bool HexagonPassConfig::addPostRegAlloc() {
   if (getOptLevel() != CodeGenOpt::None)
     if (!DisableHexagonCFGOpt)
       addPass(createHexagonCFGOptimizer(TM));
+//  if (!DisablePSIElimination)
+//    addPass(&PSIEliminationID);
   return false;
 }
 
@@ -152,7 +167,7 @@ bool HexagonPassConfig::addPreSched2() {
   const HexagonTargetMachine &TM = getHexagonTargetMachine();
 
   addPass(createHexagonCopyToCombine());
-  if (getOptLevel() != CodeGenOpt::None)
+  if (getOptLevel() != CodeGenOpt::None && !DisableIfConverter)
     addPass(&IfConverterID);
   addPass(createHexagonSplitConst32AndConst64(TM));
   printAndVerify("After hexagon split const32/64 pass");

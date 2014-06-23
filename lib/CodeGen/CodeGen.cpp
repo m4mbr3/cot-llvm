@@ -25,6 +25,7 @@ void llvm::initializeCodeGen(PassRegistry &Registry) {
   initializeBranchFolderPassPass(Registry);
   initializeCodeGenPreparePass(Registry);
   initializeDeadMachineInstructionElimPass(Registry);
+  initializeIfConvertionPreRegAllocationPass(Registry);
   initializeEarlyIfConverterPass(Registry);
   initializeExpandPostRAPass(Registry);
   initializeExpandISelPseudosPass(Registry);
@@ -52,6 +53,7 @@ void llvm::initializeCodeGen(PassRegistry &Registry) {
   initializeMachineVerifierPassPass(Registry);
   initializeOptimizePHIsPass(Registry);
   initializePHIEliminationPass(Registry);
+  initializePSIEliminationPass(Registry);
   initializePeepholeOptimizerPass(Registry);
   initializePostMachineSchedulerPass(Registry);
   initializePostRASchedulerPass(Registry);
