@@ -1016,7 +1016,40 @@ bool IfConvertionPreRegAllocation::IfConvertSimple(BBInfo &BBI, IfcvtKind Kind) 
     // available if cmp executes.
     IterIfcvt = false;
   }
+  //////////////////
+  MachineBasicBlock::iterator PHIPosIt = NULL;
+  for (MachineBasicBlock::iterator I =  NextBBI->BB->begin(),
+       E = NextBBI->BB->end(); I != E; ++I) {
+    if (!PHIPosIt)
+        if(NextBBI->BB->begin()->isPHI()) {
+            PHIPosIt = I;
+        }
+  }
+  if (PHIPosIt) {
+      MachineBasicBlock::iterator AfterPHIsIt = next (NextBBI->BB->begin());
+      MachineInstr *MPhi = NextBBI->BB->remove(NextBBI->BB->begin());
+      unsigned DestReg = MPhi->getOperand(0).getReg();
+      assert(MPhi->getOperand(0).getSubReg() == 0 && "Can't handle sub-reg PHIs");
 
+      MachineInstrBuilder M = BuildMI(*NextBBI->BB, AfterPHIsIt, MPhi->getDebugLoc(), TII->get(TargetOpcode::PSI), DestReg).addReg(MPhi->getOperand(1).getReg()).addReg(MPhi->getOperand(3).getReg());
+      SmallVector<MachineOperand, 4> CondNor(BBI.BrCond.begin(), BBI.BrCond.end());
+      SmallVector<MachineOperand, 4> CondRev(BBI.BrCond.begin(), BBI.BrCond.end());
+      TII->ReverseBranchCondition(CondRev);
+      for (SmallVector<MachineOperand, 4>::iterator I = CondNor.begin(),
+          E = CondNor.end();
+          I != E;
+          ++I) {
+        M.addOperand(*I);
+      }
+      for (SmallVector<MachineOperand, 4>::iterator I = CondRev.begin(),
+          E = CondRev.end();
+          I != E;
+          ++I) {
+          M.addOperand(*I);
+      }
+  }
+  /////////////////////////
+    
   RemoveExtraEdges(BBI);
 
   // Update block info. BB can be iteratively if-converted.
@@ -1137,29 +1170,30 @@ bool IfConvertionPreRegAllocation::IfConvertTriangle(BBInfo &BBI, IfcvtKind Kind
               PHIPosIt = I;
           }
   }
-  MachineBasicBlock::iterator AfterPHIsIt = next (NextBBI->BB->begin());
-  MachineInstr *MPhi = NextBBI->BB->remove(NextBBI->BB->begin());
-  unsigned DestReg = MPhi->getOperand(0).getReg();
-  assert(MPhi->getOperand(0).getSubReg() == 0 && "Can't handle sub-reg PHIs");
+  if (PHIPosIt) {
+      MachineBasicBlock::iterator AfterPHIsIt = next (NextBBI->BB->begin());
+      MachineInstr *MPhi = NextBBI->BB->remove(NextBBI->BB->begin());
+      unsigned DestReg = MPhi->getOperand(0).getReg();
+      assert(MPhi->getOperand(0).getSubReg() == 0 && "Can't handle sub-reg PHIs");
 
-  MachineInstrBuilder M = BuildMI(*NextBBI->BB, AfterPHIsIt, MPhi->getDebugLoc(), TII->get(TargetOpcode::PSI), DestReg).addReg(MPhi->getOperand(1).getReg()).addReg(MPhi->getOperand(3).getReg());
-  SmallVector<MachineOperand, 4> CondNor(BBI.BrCond.begin(), BBI.BrCond.end());
-  SmallVector<MachineOperand, 4> CondRev(BBI.BrCond.begin(), BBI.BrCond.end());
-  TII->ReverseBranchCondition(CondRev); 
-  for (SmallVector<MachineOperand, 4>::iterator I = CondNor.begin(), 
-      E= CondNor.end();
-      I != E;
-      ++I) {
-      M.addOperand(*I);
+      MachineInstrBuilder M = BuildMI(*NextBBI->BB, AfterPHIsIt, MPhi->getDebugLoc(), TII->get(TargetOpcode::PSI), DestReg).addReg(MPhi->getOperand(1).getReg()).addReg(MPhi->getOperand(3).getReg());
+      SmallVector<MachineOperand, 4> CondNor(BBI.BrCond.begin(), BBI.BrCond.end());
+      SmallVector<MachineOperand, 4> CondRev(BBI.BrCond.begin(), BBI.BrCond.end());
+      TII->ReverseBranchCondition(CondRev); 
+      for (SmallVector<MachineOperand, 4>::iterator I = CondNor.begin(), 
+          E= CondNor.end();
+          I != E;
+          ++I) {
+          M.addOperand(*I);
+      }
+      for (SmallVector<MachineOperand, 4>::iterator I = CondRev.begin(),
+          E = CondRev.end();
+          I != E;
+          ++I) {
+          M.addOperand(*I);
+      }
   }
-  for (SmallVector<MachineOperand, 4>::iterator I = CondRev.begin(),
-      E = CondRev.end();
-      I != E;
-      ++I) {
-      M.addOperand(*I);
-  }
-
-  ////////////////
+      ////////////////
   RemoveExtraEdges(BBI);
  
   // Update block info. BB can be iteratively if-converted.
@@ -1382,25 +1416,27 @@ bool IfConvertionPreRegAllocation::IfConvertDiamond(BBInfo &BBI, IfcvtKind Kind,
                PHIPosIt = I;
            }
     }
-    MachineBasicBlock::iterator AfterPHIsIt = next(TailBBI.BB->begin());
-    MachineInstr *MPhi = TailBBI.BB->remove(TailBBI.BB->begin());  
-    unsigned DestReg = MPhi->getOperand(0).getReg();
-    assert(MPhi->getOperand(0).getSubReg() == 0 && "Can't handle sub-reg PHIs");
-    unsigned IncomingReg = 0;
-    IncomingReg = MPhi->getOperand(1).getReg();
-    //Considerare il not
-    MachineInstrBuilder M = BuildMI(*TailBBI.BB, AfterPHIsIt, MPhi->getDebugLoc(), TII->get(TargetOpcode::PSI), DestReg).addReg(MPhi->getOperand(1).getReg()).addReg(MPhi->getOperand(3).getReg());//.addOperand(*Cond1->begin()).addOperand(*Cond2->begin()); 
-    for ( SmallVector<MachineOperand, 4>::iterator I = Cond1->begin(), 
-          E = Cond1->end(); 
-          I != E;
-          ++I) {
-        M.addOperand(*I);
-    }
-    for ( SmallVector<MachineOperand, 4>::iterator I = Cond2->begin(),
-          E = Cond2->end();
-          I != E;
-          ++I) {
-        M.addOperand(*I);
+    if(PHIPosIt) {
+        MachineBasicBlock::iterator AfterPHIsIt = next(TailBBI.BB->begin());
+        MachineInstr *MPhi = TailBBI.BB->remove(TailBBI.BB->begin());  
+        unsigned DestReg = MPhi->getOperand(0).getReg();
+        assert(MPhi->getOperand(0).getSubReg() == 0 && "Can't handle sub-reg PHIs");
+        unsigned IncomingReg = 0;
+        IncomingReg = MPhi->getOperand(1).getReg();
+        //Considerare il not
+        MachineInstrBuilder M = BuildMI(*TailBBI.BB, AfterPHIsIt, MPhi->getDebugLoc(), TII->get(TargetOpcode::PSI), DestReg).addReg(MPhi->getOperand(1).getReg()).addReg(MPhi->getOperand(3).getReg());//.addOperand(*Cond1->begin()).addOperand(*Cond2->begin()); 
+        for ( SmallVector<MachineOperand, 4>::iterator I = Cond1->begin(), 
+              E = Cond1->end(); 
+              I != E;
+              ++I) {
+            M.addOperand(*I);
+        }
+        for ( SmallVector<MachineOperand, 4>::iterator I = Cond2->begin(),
+              E = Cond2->end();
+              I != E;
+              ++I) {
+            M.addOperand(*I);
+        }
     }
     ////////////
     bool CanMergeTail = !TailBBI.HasFallThrough &&
