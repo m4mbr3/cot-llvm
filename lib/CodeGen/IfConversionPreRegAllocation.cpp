@@ -1128,9 +1128,40 @@ bool IfConvertionPreRegAllocation::IfConvertTriangle(BBInfo &BBI, IfcvtKind Kind
     // predicated.
     IterIfcvt = false;
   }
+  ///////////////////////
+  MachineBasicBlock::iterator PHIPosIt = NULL;
+  for (MachineBasicBlock::iterator I = NextBBI->BB->begin(), 
+        E = NextBBI->BB->end(); I != E; ++I) {
+      if (!PHIPosIt)
+          if(NextBBI->BB->begin()->isPHI()) {
+              PHIPosIt = I;
+          }
+  }
+  MachineBasicBlock::iterator AfterPHIsIt = next (NextBBI->BB->begin());
+  MachineInstr *MPhi = NextBBI->BB->remove(NextBBI->BB->begin());
+  unsigned DestReg = MPhi->getOperand(0).getReg();
+  assert(MPhi->getOperand(0).getSubReg() == 0 && "Can't handle sub-reg PHIs");
 
+  MachineInstrBuilder M = BuildMI(*NextBBI->BB, AfterPHIsIt, MPhi->getDebugLoc(), TII->get(TargetOpcode::PSI), DestReg).addReg(MPhi->getOperand(1).getReg()).addReg(MPhi->getOperand(3).getReg());
+  SmallVector<MachineOperand, 4> CondNor(BBI.BrCond.begin(), BBI.BrCond.end());
+  SmallVector<MachineOperand, 4> CondRev(BBI.BrCond.begin(), BBI.BrCond.end());
+  TII->ReverseBranchCondition(CondRev); 
+  for (SmallVector<MachineOperand, 4>::iterator I = CondNor.begin(), 
+      E= CondNor.end();
+      I != E;
+      ++I) {
+      M.addOperand(*I);
+  }
+  for (SmallVector<MachineOperand, 4>::iterator I = CondRev.begin(),
+      E = CondRev.end();
+      I != E;
+      ++I) {
+      M.addOperand(*I);
+  }
+
+  ////////////////
   RemoveExtraEdges(BBI);
-
+ 
   // Update block info. BB can be iteratively if-converted.
   if (!IterIfcvt)
     BBI.IsDone = true;
