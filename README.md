@@ -72,6 +72,19 @@ I also inserted an option to disable the previous pass of if convertion to avoid
   
 1. -disable-if-converter
 
+To obtain the phi nodes the bytecode should be passed through the mem2reg pass in the opt tool.
+
+The following results are produced using the code in
+
+    $LLVM_SRC/ifconv_test/diamond.c
+    $LLVM_SRC/ifconv_test/triangle.c
+    
+Using the following commands I produced the bytecode in phi form and execute the two analysis analysis:
+
+    $LLVM_ROOT/bin/clang -emit-llvm -c $FILEC -o $FILEBC
+    $LLVM_ROOT/bin/opt -mem2reg $FILEBC -o $FILEBC2
+    $LLVM_ROOT/bin/llc  -debug -print-after-all -disable-if-converter -enable-if-convertion-pre-reg-allocation -enable-psi-elimination -march=hexagon $FILEBC2
+
 ###Results###
 
 ####Case Triangle####
