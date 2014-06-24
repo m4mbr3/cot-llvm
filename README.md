@@ -50,9 +50,13 @@ Basing on these previous work I implemented those concept inside llvm/clang comp
 
 ###Implementation###
 The whole work is based on two passes added into the machine code pass chain. The first is named IfConversionPreRegAllocation (location: $LLVM\_SRC/lib/CodeGen/IfConvertionPreRegAllocation.cpp) that uses most of the structures already present inside IfConverstion pass to detect possible places where apply the transformation. Futhermore it detects the phi instructions inside the program and convert them into psi instruction. This pass is inserted before the register allocation so the pass must maintains the SSA property on the code. 
+
 The psi instruction used is a new istruction inserted into llvm. It is a generic instruction valid for every architecture and same as the phi instruction should be, later in the chain, lowered in the equivalent machine dependent set of instructions.
+
 As mentioned above the lowering pass has been implemented only for the hexagon target. Hexagon is an architecture that supports predicated instructions designed by Qualcomm. 
+
 So to lower the psi instructions has been added a new pass in the hexagon dependent pass chain (location: $LLVM\_SRC/lib/Target/Hexagon/HexagonPSIElimination.cpp) right after the PHIElimination pass and before the register allocation. In this pass all the psi instruction are converted into TFR instruction conveniently predicated with the information provided in the psi instruction. This second pass work on the machine code already out from the SSA form.
+
 To Avoid interference with other targets both of the passes are by default disabled. To include them in the chain of passes two parameters from command line have to be specified.
 
 They are:
@@ -60,6 +64,7 @@ They are:
 1. -enable-if-convertion-pre-reg-allocation 
 2. -enable-psi-elimination 
 
+Example of usage:
 
-
+    $LLVM_ROOT/bin/llc -debug -print-after-all -disable-if-converter -enable-if-convertion-pre-reg-allocation -enable-psi-elimination -march=hexagon $LLVM_TEST/triangle.bc2
   
