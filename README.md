@@ -5,18 +5,20 @@ If Convertion Pre Register Allocation
 
 ###Author :###
 
-    Andrea Mambretti (Mtr. 783286)
+    Andrea Mambretti (Mtr. 783286) - Politecnico di Milano
 
 ###Advisors:###
 
-    Prof. Giovanni Agosta 
+    Prof. Giovanni Agosta - Politecnico di Milano
 
-    Prof. Michele Scandale
+    Prof. Michele Scandale - Politecnico di Milano
 
 ###Abstract:###
 The aim of this project is to provide an if conversion implementation on the machine code when it is still in a SSA form. 
 Everything has been implemented in llvm/clang compiler that already has two If conversion passes. 
-1. IfConversioni pass: is designed to work on the machine code after the register allocation for architectures that support instruction predication (ex ARM, Hexagon). 
+
+1. IfConversion pass: is designed to work on the machine code after the register allocation for architectures that support instruction predication (ex ARM, Hexagon). 
+
 2. EarlyIfConversion pass: is aimed to work before the register allocation but is designed to exploit if conversion optmization on architectures such as x86 that don't support predicated instruction. Instead
 it uses select instructions to express the same capability.
 
