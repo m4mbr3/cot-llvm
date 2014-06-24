@@ -66,7 +66,7 @@ They are:
 
 Example of usage:
 
-    $LLVM_ROOT/bin/llc -debug -print-after-all -disable-if-converter -enable-if-convertion-pre-reg-allocation -enable-psi-elimination -march=hexagon $LLVM_TEST/triangle.bc2
+    $LLVM_ROOT/bin/llc -debug -print-after-all -disable-if-converter -enable-if-convertion-pre-reg-allocation -enable-psi-elimination -march=hexagon $LLVM_TEST/triangle.bc
 
 I also inserted an option to disable the previous pass of if convertion to avoid useless operations during the compilation.
   
@@ -76,7 +76,7 @@ I also inserted an option to disable the previous pass of if convertion to avoid
 
 ####Case Triangle####
 
-IR Code:
+#####IR Code:#####
 
     ; Function Attrs: nounwind uwtable
     define i32 @main() #0 {
@@ -100,7 +100,7 @@ IR Code:
     }
 
 
-Before IfConvertionPreRegAllocation:
+#####Before IfConvertionPreRegAllocation:#####
 
 
     BB#0: derived from LLVM BB %entry
@@ -132,7 +132,7 @@ Before IfConvertionPreRegAllocation:
             %R0<def> = COPY %vreg10; IntRegs:%vreg10
             JMPret %R31, %PC<imp-def,dead>, %R0<imp-use>
 
-During IfConvertionPreRegAllocation:
+#####During IfConvertionPreRegAllocation:#####
 
     Ifcvt: function (0) 'main'
     Ifcvt (Triangle false): BB#0 (T:2,F:1) succeeded!
@@ -165,7 +165,7 @@ During IfConvertionPreRegAllocation:
     Removing MBB: BB#2: derived from LLVM BB %if.end
 
 
-After IfConvertionPreRegAllocation:
+#####After IfConvertionPreRegAllocation:#####
 
     # *** IR Dump After If Convertion on machine code before register allocation ***:
     # Machine code for function main: SSA
@@ -189,7 +189,7 @@ After IfConvertionPreRegAllocation:
         %R0<def> = COPY %vreg10; IntRegs:%vreg10
         JMPret %R31, %PC<imp-def,dead>, %R0<imp-use>
 
-After PSIElimination:
+#####After PSIElimination:#####
 
     # *** IR Dump After Eliminate PSI nodes for register allocation ***:
     # Machine code for function main: Post SSA
@@ -213,3 +213,130 @@ After PSIElimination:
         %vreg10<def> = TFRI 0; IntRegs:%vreg10
         %R0<def> = COPY %vreg10<kill>; IntRegs:%vreg10
         JMPret %R31, %PC<imp-def,dead>, %R0<imp-use,kill> 
+
+
+####Case Diamond####
+
+#####IR Code:#####
+
+    ; Function Attrs: nounwind uwtable
+    define i32 @main() #0 {
+    entry:
+      %rem = srem i32 3, 2
+      %cmp = icmp eq i32 %rem, 0
+      br i1 %cmp, label %if.then, label %if.else
+
+    if.then:                                          ; preds = %entry
+      %inc = add nsw i32 3, 1
+      %inc1 = add nsw i32 %inc, 1
+      br label %if.end
+
+    if.else:                                          ; preds = %entry
+      %inc2 = add nsw i32 3, 1
+      %add = add nsw i32 -3, 1
+      br label %if.end
+
+    if.end:                                           ; preds = %if.else, %if.then
+      %ciao.0 = phi i32 [ 3, %if.then ], [ %add, %if.else ]
+      %call = call i32 (i8*, ...)* @printf(i8* getelementptr inbounds ([3 x i8]* @.str, i32 0, i32 0), i32 %ciao.0)
+      ret i32 0
+    }
+
+#####Before IfConvertionPreRegAllocation:#####
+
+    BB#0: derived from LLVM BB %entry
+            %vreg2<def> = TFRI 0; IntRegs:%vreg2
+            %vreg3<def> = TFR_PdRs %vreg2<kill>; PredRegs:%vreg3 IntRegs:%vreg2
+            %vreg4<def> = NOT_p %vreg3; PredRegs:%vreg4,%vreg3
+            %vreg5<def> = XOR_pp %vreg3, %vreg4<kill>; PredRegs:%vreg5,%vreg3,%vreg4
+            JMP_t %vreg5<kill>, <BB#2>, %PC<imp-def,dead>; PredRegs:%vreg5
+            JMP <BB#1>, %PC<imp-def,dead>
+        Successors according to CFG: BB#1(12) BB#2(20)
+
+    BB#1: derived from LLVM BB %if.then
+        Predecessors according to CFG: BB#0
+            %vreg6<def> = TFRI 3; IntRegs:%vreg6
+            JMP <BB#3>, %PC<imp-def,dead>
+        Successors according to CFG: BB#3
+
+    BB#2: derived from LLVM BB %if.else
+        Predecessors according to CFG: BB#0
+            %vreg0<def> = TFRI -2; IntRegs:%vreg0
+        Successors according to CFG: BB#3
+
+    BB#3: derived from LLVM BB %if.end
+        Predecessors according to CFG: BB#2 BB#1
+            %vreg1<def> = PHI %vreg0, <BB#2>, %vreg6, <BB#1>; IntRegs:%vreg1,%vreg0,%vreg6
+            %vreg7<def> = COPY %R29; IntRegs:%vreg7
+            STriw %vreg7, 0, %vreg1; mem:ST4[<unknown>] IntRegs:%vreg7,%vreg1
+            %vreg8<def> = TFRI_V4 <ga:@.str>; IntRegs:%vreg8
+            ADJCALLSTACKDOWN 4, %R29<imp-def,dead>, %R30<imp-def,dead>, %R31<imp-use>, %R30<imp-use>, %R29<imp-use>
+            %R0<def> = COPY %vreg8; IntRegs:%vreg8
+            CALLv3 <ga:@printf>, %D0<imp-def>, %R31<imp-def,dead>, %R0<imp-use>, ...
+            ADJCALLSTACKUP 4, 0, %R29<imp-def,dead>, %R30<imp-def,dead>, %R31<imp-def,dead>, %R29<imp-use>
+            %vreg10<def> = TFRI 0; IntRegs:%vreg10
+            %R0<def> = COPY %vreg10; IntRegs:%vreg10
+            JMPret %R31, %PC<imp-def,dead>, %R0<imp-use>
+
+#####During IfConvertionPreRegAllocation:#####
+
+    Ifcvt: function (0) 'main'
+    Ifcvt (Diamond): BB#0 (T:2,F:1) succeeded!
+
+    Removing MBB: BB#1: derived from LLVM BB %if.then
+        Successors according to CFG: BB#2
+
+    Removing MBB: BB#2: derived from LLVM BB %if.else
+        Successors according to CFG: BB#3
+
+    Removing MBB: BB#3: derived from LLVM BB %if.end
+
+
+#####After IfConvertionPreRegAllocation:#####
+
+    # *** IR Dump After If Convertion on machine code before register allocation ***:
+    # Machine code for function main: SSA
+
+    BB#0: derived from LLVM BB %entry
+            %vreg2<def> = TFRI 0; IntRegs:%vreg2
+            %vreg3<def> = TFR_PdRs %vreg2<kill>; PredRegs:%vreg3 IntRegs:%vreg2
+            %vreg4<def> = NOT_p %vreg3; PredRegs:%vreg4,%vreg3
+            %vreg5<def> = XOR_pp %vreg3, %vreg4<kill>; PredRegs:%vreg5,%vreg3,%vreg4
+            %vreg0<def> = TFRI_cPt %vreg5, -2; IntRegs:%vreg0 PredRegs:%vreg5
+            %vreg6<def> = TFRI_cNotPt %vreg5, 3; IntRegs:%vreg6 PredRegs:%vreg5
+            %vreg1<def> = PSI %vreg0, %vreg6, %vreg5<kill>, 0, %vreg5<kill>; IntRegs:%vreg1,%vreg0,%vreg6 PredRegs:%vreg5
+            %vreg7<def> = COPY %R29; IntRegs:%vreg7
+            STriw %vreg7, 0, %vreg1; mem:ST4[<unknown>] IntRegs:%vreg7,%vreg1
+            %vreg8<def> = TFRI_V4 <ga:@.str>; IntRegs:%vreg8
+            ADJCALLSTACKDOWN 4, %R29<imp-def,dead>, %R30<imp-def,dead>, %R31<imp-use>, %R30<imp-use>, %R29<imp-use>
+            %R0<def> = COPY %vreg8; IntRegs:%vreg8
+            CALLv3 <ga:@printf>, %D0<imp-def>, %R31<imp-def,dead>, %R0<imp-use>, ...
+            ADJCALLSTACKUP 4, 0, %R29<imp-def,dead>, %R30<imp-def,dead>, %R31<imp-def,dead>, %R29<imp-use>
+            %vreg10<def> = TFRI 0; IntRegs:%vreg10
+            %R0<def> = COPY %vreg10; IntRegs:%vreg10
+            JMPret %R31, %PC<imp-def,dead>, %R0<imp-use>
+
+#####After PSIElimination:#####
+
+    # *** IR Dump After Eliminate PSI nodes for register allocation ***:
+    # Machine code for function main: Post SSA
+
+    BB#0: derived from LLVM BB %entry
+            %vreg2<def> = TFRI 0; IntRegs:%vreg2
+            %vreg3<def> = TFR_PdRs %vreg2<kill>; PredRegs:%vreg3 IntRegs:%vreg2
+            %vreg4<def> = NOT_p %vreg3; PredRegs:%vreg4,%vreg3
+            %vreg5<def> = XOR_pp %vreg3<kill>, %vreg4<kill>; PredRegs:%vreg5,%vreg3,%vreg4
+            %vreg0<def> = TFRI_cPt %vreg5, -2; IntRegs:%vreg0 PredRegs:%vreg5
+            %vreg6<def> = TFRI_cNotPt %vreg5, 3; IntRegs:%vreg6 PredRegs:%vreg5
+            %vreg1<def> = TFR_cNotPt %vreg5, %vreg6; IntRegs:%vreg1,%vreg6 PredRegs:%vreg5
+            %vreg1<def> = TFR_cPt %vreg5, %vreg0; IntRegs:%vreg1,%vreg0 PredRegs:%vreg5
+            %vreg7<def> = COPY %R29; IntRegs:%vreg7
+            STriw %vreg7<kill>, 0, %vreg1<kill>; mem:ST4[<unknown>] IntRegs:%vreg7,%vreg1
+            %vreg8<def> = TFRI_V4 <ga:@.str>; IntRegs:%vreg8
+            ADJCALLSTACKDOWN 4, %R29<imp-def>, %R30<imp-def>, %R31<imp-use>, %R30<imp-use>, %R29<imp-use>
+            %R0<def> = COPY %vreg8<kill>; IntRegs:%vreg8
+            CALLv3 <ga:@printf>, %D0<imp-def,dead>, %R31<imp-def>, %R0<imp-use,kill>, ...
+            ADJCALLSTACKUP 4, 0, %R29<imp-def>, %R30<imp-def>, %R31<imp-def>, %R29<imp-use>
+            %vreg10<def> = TFRI 0; IntRegs:%vreg10
+            %R0<def> = COPY %vreg10<kill>; IntRegs:%vreg10
+            JMPret %R31, %PC<imp-def,dead>, %R0<imp-use,kill>
