@@ -36,7 +36,7 @@ if a phi node is converted in a psi node after the if-convertion.
 In 2007 Psi-SSA form has been improved by F. De Ferriere in [4] extending the psi-function concept to work also with partial predicated instruction set. The only difference in the representation is
 that when a psi operation is created as a replacemente for a phi operation some of its arguments may be defined by operations that cannot be predicated.
 
-Basing on these previous work I implemented those concept inside llvm/clang compiler suite in such a way during the if-conversion on the program in SSA form all the phi nodes are converted into psi node. And afterwards all those new nodes are lowered depending the architecture we are dealing with. In the current implementation the lowering phase is implemented for the hexagon targer.
+Basing on these previous work I implemented those concept inside llvm/clang compiler suite in such a way during the if-conversion on the program in SSA form all the phi nodes are converted into psi node. And afterwards all those new nodes are lowered depending the architecture we are dealing with. In the current implementation the lowering phase is implemented for the hexagon target.
 
 
 
@@ -67,4 +67,149 @@ They are:
 Example of usage:
 
     $LLVM_ROOT/bin/llc -debug -print-after-all -disable-if-converter -enable-if-convertion-pre-reg-allocation -enable-psi-elimination -march=hexagon $LLVM_TEST/triangle.bc2
+
+I also inserted an option to disable the previous pass of if convertion to avoid useless operations during the compilation.
   
+1. -disable-if-converter
+
+###Results###
+
+####Case Triangle####
+
+IR Code:
+
+    ; Function Attrs: nounwind uwtable
+    define i32 @main() #0 {
+    entry:
+      %rem = srem i32 3, 2
+      %cmp = icmp eq i32 %rem, 0
+      br i1 %cmp, label %if.then, label %if.else
+
+    if.then:                                          ; preds = %entry
+      %inc = add nsw i32 3, 1
+      %inc1 = add nsw i32 %inc, 1
+      br label %if.end
+
+    if.else:                                          ; preds = %entry
+      br label %if.end
+
+    if.end:                                           ; preds = %if.else, %if.then
+      %ciao.0 = phi i32 [ 3, %if.then ], [ -3, %if.else ]
+      %call = call i32 (i8*, ...)* @printf(i8* getelementptr inbounds ([3 x i8]* @.str, i32 0, i32 0), i32 %ciao.0)
+      ret i32 0
+    }
+
+
+Before IfConvertionPreRegAllocation:
+
+
+    BB#0: derived from LLVM BB %entry
+            %vreg2<def> = TFRI 0; IntRegs:%vreg2
+            %vreg1<def> = TFRI -3; IntRegs:%vreg1
+            %vreg3<def> = TFR_PdRs %vreg2<kill>; PredRegs:%vreg3 IntRegs:%vreg2
+            %vreg4<def> = NOT_p %vreg3; PredRegs:%vreg4,%vreg3
+            %vreg5<def> = XOR_pp %vreg3, %vreg4<kill>; PredRegs:%vreg5,%vreg3,%vreg4
+            JMP_t %vreg5<kill>, <BB#2>, %PC<imp-def,dead>; PredRegs:%vreg5
+            JMP <BB#1>, %PC<imp-def,dead>
+        Successors according to CFG: BB#1(12) BB#2(20)
+
+    BB#1: derived from LLVM BB %if.then
+        Predecessors according to CFG: BB#0
+            %vreg6<def> = TFRI 3; IntRegs:%vreg6
+        Successors according to CFG: BB#2
+
+    BB#2: derived from LLVM BB %if.end
+        Predecessors according to CFG: BB#0 BB#1
+            %vreg0<def> = PHI %vreg1, <BB#0>, %vreg6, <BB#1>; IntRegs:%vreg0,%vreg1,%vreg6
+            %vreg7<def> = COPY %R29; IntRegs:%vreg7
+            STriw %vreg7, 0, %vreg0; mem:ST4[<unknown>] IntRegs:%vreg7,%vreg0
+            %vreg8<def> = TFRI_V4 <ga:@.str>; IntRegs:%vreg8
+            ADJCALLSTACKDOWN 4, %R29<imp-def,dead>, %R30<imp-def,dead>, %R31<imp-use>, %R30<imp-use>, %R29<imp-use>
+            %R0<def> = COPY %vreg8; IntRegs:%vreg8
+            CALLv3 <ga:@printf>, %D0<imp-def>, %R31<imp-def,dead>, %R0<imp-use>, ...
+            ADJCALLSTACKUP 4, 0, %R29<imp-def,dead>, %R30<imp-def,dead>, %R31<imp-def,dead>, %R29<imp-use>
+            %vreg10<def> = TFRI 0; IntRegs:%vreg10
+            %R0<def> = COPY %vreg10; IntRegs:%vreg10
+            JMPret %R31, %PC<imp-def,dead>, %R0<imp-use>
+
+During IfConvertionPreRegAllocation:
+
+    Ifcvt: function (0) 'main'
+    Ifcvt (Triangle false): BB#0 (T:2,F:1) succeeded!
+
+    Removing MBB: BB#1: derived from LLVM BB %if.then
+        Successors according to CFG: BB#2
+
+    Merging into block: BB#0: derived from LLVM BB %entry
+            %vreg2<def> = TFRI 0; IntRegs:%vreg2
+            %vreg1<def> = TFRI -3; IntRegs:%vreg1
+            %vreg3<def> = TFR_PdRs %vreg2<kill>; PredRegs:%vreg3 IntRegs:%vreg2
+            %vreg4<def> = NOT_p %vreg3; PredRegs:%vreg4,%vreg3
+            %vreg5<def> = XOR_pp %vreg3, %vreg4<kill>; PredRegs:%vreg5,%vreg3,%vreg4
+            %vreg6<def> = TFRI_cNotPt %vreg5, 3; IntRegs:%vreg6 PredRegs:%vreg5
+        Successors according to CFG: BB#2(12)
+    From MBB: BB#2: derived from LLVM BB %if.end
+        Predecessors according to CFG: BB#0
+            %vreg0<def> = PSI %vreg1, %vreg6, %vreg5<kill>, 0, %vreg5<kill>; IntRegs:%vreg0,%vreg1,%vreg6 PredRegs:%vreg5
+            %vreg7<def> = COPY %R29; IntRegs:%vreg7
+            STriw %vreg7, 0, %vreg0; mem:ST4[<unknown>] IntRegs:%vreg7,%vreg0
+            %vreg8<def> = TFRI_V4 <ga:@.str>; IntRegs:%vreg8
+            ADJCALLSTACKDOWN 4, %R29<imp-def,dead>, %R30<imp-def,dead>, %R31<imp-use>, %R30<imp-use>, %R29<imp-use>
+            %R0<def> = COPY %vreg8; IntRegs:%vreg8
+            CALLv3 <ga:@printf>, %D0<imp-def>, %R31<imp-def,dead>, %R0<imp-use>, ...
+            ADJCALLSTACKUP 4, 0, %R29<imp-def,dead>, %R30<imp-def,dead>, %R31<imp-def,dead>, %R29<imp-use>
+            %vreg10<def> = TFRI 0; IntRegs:%vreg10
+            %R0<def> = COPY %vreg10; IntRegs:%vreg10
+            JMPret %R31, %PC<imp-def,dead>, %R0<imp-use>
+
+    Removing MBB: BB#2: derived from LLVM BB %if.end
+
+
+After IfConvertionPreRegAllocation:
+
+    # *** IR Dump After If Convertion on machine code before register allocation ***:
+    # Machine code for function main: SSA
+
+    BB#0: derived from LLVM BB %entry
+        %vreg2<def> = TFRI 0; IntRegs:%vreg2
+        %vreg1<def> = TFRI -3; IntRegs:%vreg1
+        %vreg3<def> = TFR_PdRs %vreg2<kill>; PredRegs:%vreg3 IntRegs:%vreg2
+        %vreg4<def> = NOT_p %vreg3; PredRegs:%vreg4,%vreg3
+        %vreg5<def> = XOR_pp %vreg3, %vreg4<kill>; PredRegs:%vreg5,%vreg3,%vreg4
+        %vreg6<def> = TFRI_cNotPt %vreg5, 3; IntRegs:%vreg6 PredRegs:%vreg5
+        %vreg0<def> = PSI %vreg1, %vreg6, %vreg5<kill>, 0, %vreg5<kill>; IntRegs:%vreg0,%vreg1,%vreg6 PredRegs:%vreg5
+        %vreg7<def> = COPY %R29; IntRegs:%vreg7
+        STriw %vreg7, 0, %vreg0; mem:ST4[<unknown>] IntRegs:%vreg7,%vreg0
+        %vreg8<def> = TFRI_V4 <ga:@.str>; IntRegs:%vreg8
+        ADJCALLSTACKDOWN 4, %R29<imp-def,dead>, %R30<imp-def,dead>, %R31<imp-use>, %R30<imp-use>, %R29<imp-use>
+        %R0<def> = COPY %vreg8; IntRegs:%vreg8
+        CALLv3 <ga:@printf>, %D0<imp-def>, %R31<imp-def,dead>, %R0<imp-use>, ...
+        ADJCALLSTACKUP 4, 0, %R29<imp-def,dead>, %R30<imp-def,dead>, %R31<imp-def,dead>, %R29<imp-use>
+        %vreg10<def> = TFRI 0; IntRegs:%vreg10
+        %R0<def> = COPY %vreg10; IntRegs:%vreg10
+        JMPret %R31, %PC<imp-def,dead>, %R0<imp-use>
+
+After PSIElimination:
+
+    # *** IR Dump After Eliminate PSI nodes for register allocation ***:
+    # Machine code for function main: Post SSA
+
+    BB#0: derived from LLVM BB %entry
+        %vreg2<def> = TFRI 0; IntRegs:%vreg2
+        %vreg1<def> = TFRI -3; IntRegs:%vreg1
+        %vreg3<def> = TFR_PdRs %vreg2<kill>; PredRegs:%vreg3 IntRegs:%vreg2
+        %vreg4<def> = NOT_p %vreg3; PredRegs:%vreg4,%vreg3
+        %vreg5<def> = XOR_pp %vreg3<kill>, %vreg4<kill>; PredRegs:%vreg5,%vreg3,%vreg4
+        %vreg6<def> = TFRI_cNotPt %vreg5, 3; IntRegs:%vreg6 PredRegs:%vreg5
+        %vreg0<def> = TFR_cNotPt %vreg5, %vreg6; IntRegs:%vreg0,%vreg6 PredRegs:%vreg5
+        %vreg0<def> = TFR_cPt %vreg5, %vreg1; IntRegs:%vreg0,%vreg1 PredRegs:%vreg5
+        %vreg7<def> = COPY %R29; IntRegs:%vreg7
+        STriw %vreg7<kill>, 0, %vreg0<kill>; mem:ST4[<unknown>] IntRegs:%vreg7,%vreg0
+        %vreg8<def> = TFRI_V4 <ga:@.str>; IntRegs:%vreg8
+        ADJCALLSTACKDOWN 4, %R29<imp-def>, %R30<imp-def>, %R31<imp-use>, %R30<imp-use>, %R29<imp-use>
+        %R0<def> = COPY %vreg8<kill>; IntRegs:%vreg8
+        CALLv3 <ga:@printf>, %D0<imp-def,dead>, %R31<imp-def>, %R0<imp-use,kill>, ...
+        ADJCALLSTACKUP 4, 0, %R29<imp-def>, %R30<imp-def>, %R31<imp-def>, %R29<imp-use>
+        %vreg10<def> = TFRI 0; IntRegs:%vreg10
+        %R0<def> = COPY %vreg10<kill>; IntRegs:%vreg10
+        JMPret %R31, %PC<imp-def,dead>, %R0<imp-use,kill> 
