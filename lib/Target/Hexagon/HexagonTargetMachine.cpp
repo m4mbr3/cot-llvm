@@ -25,7 +25,6 @@
 #include "llvm/Transforms/Scalar.h"
 
 using namespace llvm;
-
 static cl:: opt<bool> DisableHardwareLoops("disable-hexagon-hwloops",
       cl::Hidden, cl::desc("Disable Hardware Loops for Hexagon target"));
 
@@ -37,11 +36,11 @@ static cl::opt<bool> DisableHexagonCFGOpt("disable-hexagon-cfgopt",
       cl::Hidden, cl::ZeroOrMore, cl::init(false),
       cl::desc("Disable Hexagon CFG Optimization"));
 
-static cl::opt<bool> DisableIfConvertionPreRegAllocation("disable-if-convertion-pre-reg-allocation", 
-      cl::Hidden, cl::ZeroOrMore, cl::init(false), 
-      cl::desc("Disable Hexagon if convertion pre reg allocation"));
+static cl::opt<bool> EnableIfConvertionPreRegAllocation("enable-if-convertion-pre-reg-allocation", 
+      cl::ZeroOrMore, cl::init(false), 
+      cl::desc("Enable Hexagon if convertion pre reg allocation"));
 
-static cl::opt<bool> DisablePSIElimination ("disable-psi-elimination",
+static cl::opt<bool> EnablePSIElimination ("disable-psi-elimination",
        cl::Hidden, cl::ZeroOrMore, cl::init(false),
        cl::desc("Disable Hexagon PSIElimination "));
 
@@ -148,7 +147,7 @@ bool HexagonPassConfig::addPreRegAlloc() {
   if (getOptLevel() != CodeGenOpt::None)
     if (!DisableHardwareLoops)
       addPass(createHexagonHardwareLoops());
-    if(!DisableIfConvertionPreRegAllocation)
+    if(EnableIfConvertionPreRegAllocation) 
       addPass(&IfConvertionPreRegAllocationID);
   return false;
 }
@@ -158,8 +157,6 @@ bool HexagonPassConfig::addPostRegAlloc() {
   if (getOptLevel() != CodeGenOpt::None)
     if (!DisableHexagonCFGOpt)
       addPass(createHexagonCFGOptimizer(TM));
-//  if (!DisablePSIElimination)
-//    addPass(&PSIEliminationID);
   return false;
 }
 
