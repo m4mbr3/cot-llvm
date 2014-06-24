@@ -39,12 +39,6 @@ that when a psi operation is created as a replacemente for a phi operation some 
 Basing on these previous work I implemented those concept inside llvm/clang compiler suite in such a way during the if-conversion on the program in SSA form all the phi nodes are converted into psi node. And afterwards all those new nodes are lowered depending the architecture we are dealing with. In the current implementation the lowering phase is implemented for the hexagon targer.
 
 
- 
-
-
-
-
-
 
 [1] Efficient static single assignment form for predication.
 
@@ -53,3 +47,19 @@ Basing on these previous work I implemented those concept inside llvm/clang comp
 [3] If-Conversion in SSA form
 
 [4] Improvements to the Psi-SSA representation.
+
+###Implementation###
+The whole work is based on two passes added into the machine code pass chain. The first is named IfConversionPreRegAllocation (location: $LLVM\_SRC/lib/CodeGen/IfConvertionPreRegAllocation.cpp) that uses most of the structures already present inside IfConverstion pass to detect possible places where apply the transformation. Futhermore it detects the phi instructions inside the program and convert them into psi instruction. This pass is inserted before the register allocation so the pass must maintains the SSA property on the code. 
+The psi instruction used is a new istruction inserted into llvm. It is a generic instruction valid for every architecture and same as the phi instruction should be, later in the chain, lowered in the equivalent machine dependent set of instructions.
+As mentioned above the lowering pass has been implemented only for the hexagon target. Hexagon is an architecture that supports predicated instructions designed by Qualcomm. 
+So to lower the psi instructions has been added a new pass in the hexagon dependent pass chain (location: $LLVM\_SRC/lib/Target/Hexagon/HexagonPSIElimination.cpp) right after the PHIElimination pass and before the register allocation. In this pass all the psi instruction are converted into TFR instruction conveniently predicated with the information provided in the psi instruction. This second pass work on the machine code already out from the SSA form.
+To Avoid interference with other targets both of the passes are by default disabled. To include them in the chain of passes two parameters from command line have to be specified.
+
+They are:
+
+1. -enable-if-convertion-pre-reg-allocation 
+2. -enable-psi-elimination 
+
+
+
+  
