@@ -30,7 +30,7 @@ In 2001, A. Stoutchinin and  F. De Ferriere presented in [1] an improvement of t
 by J.Lee at all. In [2] they introduced pi-functions that collect the data flow information for shared variables referenced in different program threads. Instead, in the psi-form
 this value is unique determined by the scheduling order of predicated assignments to a variable and the runtime values of predicates.
 
-In 2004 A. Stoutchinin and G. Gao in [3] showed how an if-convertion optimization could be performed on programs in SSA-form. The exploit the duality between phi and psi nodes. In fact the meaning of a program doesn't change
+In 2004 A. Stoutchinin and G. Gao in [3] showed how an if-convertion optimization could be performed on programs in SSA-form. They exploit the duality between phi and psi nodes. In fact the meaning of a program doesn't change
 if a phi node is converted in a psi node after the if-convertion.
 
 In 2007 Psi-SSA form has been improved by F. De Ferriere in [4] extending the psi-function concept to work also with partial predicated instruction set. The only difference in the representation is
