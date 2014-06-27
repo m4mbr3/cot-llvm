@@ -10,10 +10,5 @@ int main(void) {
        i++;
        i++;
     }
-    else {
-        //i++;
-        //ciao = ciao + 1;
-    }
-
     printf("%d", ciao);
 }
